@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Focus Live Telemetry Trainer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Hamburger Menu Button -->
+    <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <!-- Side Navigation -->
+    <nav id="sideNav" class="side-nav">
+        <div class="side-nav-header">
+            <h2>Admin Panel</h2>
+            <button id="closeNav" class="close-btn">&times;</button>
+        </div>
+        
+        <div class="side-nav-content">
+            <div class="admin-section">
+                <h3>Beginner Mode Presets</h3>
+                <div class="preset-buttons">
+                    <button class="preset-btn" data-preset="easy">Easy</button>
+                    <button class="preset-btn active" data-preset="medium">Medium</button>
+                    <button class="preset-btn" data-preset="hard">Hard</button>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3>Custom Settings</h3>
+                
+                <div class="setting-item">
+                    <label for="playbackSpeed">Playback Speed</label>
+                    <div class="setting-control">
+                        <input type="range" id="playbackSpeed" min="0.3" max="1.0" step="0.05" value="0.7">
+                        <span id="speedValue" class="setting-value">0.7×</span>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label for="tolerancePercent">Tolerance</label>
+                    <div class="setting-control">
+                        <input type="range" id="tolerancePercent" min="5" max="25" step="1" value="15">
+                        <span id="toleranceValue" class="setting-value">±15%</span>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label for="brakeThreshold">Brake Lock Threshold</label>
+                    <div class="setting-control">
+                        <input type="range" id="brakeThreshold" min="5" max="30" step="5" value="10">
+                        <span id="thresholdValue" class="setting-value">10%</span>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="allowOverlap" class="setting-checkbox">
+                        Allow Throttle/Brake Overlap
+                    </label>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <button id="applySettings" class="apply-btn">Apply Settings</button>
+                <button id="resetDefaults" class="reset-btn">Reset to Defaults</button>
+            </div>
+
+            <div class="admin-section current-settings">
+                <h3>Current Config</h3>
+                <div class="config-display">
+                    <p><strong>Speed:</strong> <span id="currentSpeed">0.7×</span></p>
+                    <p><strong>Tolerance:</strong> <span id="currentTolerance">±15%</span></p>
+                    <p><strong>Brake Lock:</strong> <span id="currentThreshold">10%</span></p>
+                    <p><strong>Overlap:</strong> <span id="currentOverlap">Disabled</span></p>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3>Session History</h3>
+                <div id="sessionHistory" class="session-list">
+                    <p class="no-sessions">No recorded sessions yet</p>
+                </div>
+                <button id="clearHistory" class="reset-btn" style="margin-top: 10px;">Clear All History</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>Full Focus Live Telemetry Trainer</h1>
+            <p class="subtitle">Master throttle and brake control</p>
+            <div id="replayBanner" class="replay-banner" style="display: none;">
+                <span>🎬 REPLAY MODE</span>
+                <button id="exitReplay" class="exit-replay-btn">Exit Replay</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Controls Panel -->
+            <div class="controls-panel">
+                <div class="mode-selector">
+                    <h3>Training Mode</h3>
+                    <div class="button-group">
+                        <button id="beginnerMode" class="mode-btn active">Beginner</button>
+                        <button id="advancedMode" class="mode-btn">Advanced</button>
+                    </div>
+                    <div class="mode-info" id="modeInfo">
+                        <p><strong>Beginner Mode</strong></p>
+                        <p>• No overlap allowed</p>
+                        <p>• Speed: 0.7×</p>
+                        <p>• Tolerance: ±15%</p>
+                    </div>
+                </div>
+
+                <div class="session-controls">
+                    <button id="startBtn" class="primary-btn">Start Training</button>
+                    <button id="resetBtn" class="secondary-btn">Reset</button>
+                </div>
+
+                <div class="input-display">
+                    <h3>Current Input</h3>
+                    <div class="input-bars">
+                        <div class="input-bar">
+                            <label>Throttle</label>
+                            <div class="bar-container">
+                                <div id="throttleBar" class="bar throttle-bar"></div>
+                                <span id="throttleValue">0%</span>
+                            </div>
+                        </div>
+                        <div class="input-bar">
+                            <label>Brake</label>
+                            <div class="bar-container">
+                                <div id="brakeBar" class="bar brake-bar"></div>
+                                <span id="brakeValue">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="keyboard-hints">
+                        <p><kbd>W</kbd> Throttle</p>
+                        <p><kbd>S</kbd> Brake</p>
+                    </div>
+                </div>
+
+                <div class="score-panel">
+                    <h3>Live Scoring</h3>
+                    <div class="score-item">
+                        <div class="score-header">
+                            <span class="score-label">Mean Deviation:</span>
+                            <span id="meanDeviation" class="score-value">--%</span>
+                        </div>
+                        <p class="score-info">Avg difference from reference (active pedal only)</p>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-header">
+                            <span class="score-label">Timing Offset:</span>
+                            <span id="timingOffset" class="score-value">--ms</span>
+                        </div>
+                        <p class="score-info">+ = too early, - = too late</p>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-header">
+                            <span class="score-label">Smoothness:</span>
+                            <span id="smoothness" class="score-value">--%</span>
+                        </div>
+                        <p class="score-info">Based on input rate of change (higher = better)</p>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-header">
+                            <span class="score-label">Accuracy:</span>
+                            <span id="accuracy" class="score-value accuracy-display">--</span>
+                        </div>
+                        <p class="score-info">Overall grade: A+ to F</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telemetry Graph -->
+            <div class="graph-container">
+                <div class="graph-header">
+                    <h3>Live Telemetry</h3>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <span class="legend-color reference-throttle"></span>
+                            <span>Ref Throttle</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color reference-brake"></span>
+                            <span>Ref Brake</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color player-good"></span>
+                            <span>Good</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color player-ok"></span>
+                            <span>OK</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color player-bad"></span>
+                            <span>Poor</span>
+                        </div>
+                    </div>
+                </div>
+                <canvas id="telemetryCanvas"></canvas>
+                <div class="graph-labels">
+                    <div class="y-label">Input %</div>
+                    <div class="x-label">Time (scrolling)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Summary Modal -->
+        <div id="summaryModal" class="modal">
+            <div class="modal-content">
+                <h2>Session Complete!</h2>
+                <div class="summary-stats">
+                    <div class="stat-box">
+                        <h3 id="summaryDeviation">--%</h3>
+                        <p>Mean Deviation</p>
+                    </div>
+                    <div class="stat-box">
+                        <h3 id="summaryOffset">--ms</h3>
+                        <p>Timing Offset</p>
+                    </div>
+                    <div class="stat-box">
+                        <h3 id="summarySmoothness">--%</h3>
+                        <p>Smoothness</p>
+                    </div>
+                    <div class="stat-box">
+                        <h3 id="summaryGrade">--</h3>
+                        <p>Overall Grade</p>
+                    </div>
+                </div>
+                <button id="closeModal" class="primary-btn">Continue Training</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="telemetryData.js"></script>
+    <script src="inputHandler.js"></script>
+    <script src="graphRenderer.js"></script>
+    <script src="scoring.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
