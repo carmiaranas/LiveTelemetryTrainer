@@ -77,17 +77,34 @@ class LiveTelemetryTrainer {
             currentTolerance: document.getElementById('currentTolerance'),
             currentThreshold: document.getElementById('currentThreshold'),
             currentOverlap: document.getElementById('currentOverlap'),
+            // Channel visibility toggles
+            showThrottle: document.getElementById('showThrottle'),
+            showBrake: document.getElementById('showBrake'),
+            // Pattern display
+            currentPattern: document.getElementById('currentPattern'),
             // Session history elements
             sessionHistory: document.getElementById('sessionHistory'),
             clearHistory: document.getElementById('clearHistory'),
             replayBanner: document.getElementById('replayBanner'),
-            exitReplay: document.getElementById('exitReplay')
+            exitReplay: document.getElementById('exitReplay'),
+            // Pattern editor elements
+            patternSelect: document.getElementById('patternSelect'),
+            patternDescription: document.getElementById('patternDescription'),
+            patternDuration: document.getElementById('patternDuration'),
+            patternJSON: document.getElementById('patternJSON'),
+            patternValidation: document.getElementById('patternValidation'),
+            loadPattern: document.getElementById('loadPattern'),
+            saveCustomPattern: document.getElementById('saveCustomPattern'),
+            exportPattern: document.getElementById('exportPattern'),
+            importPattern: document.getElementById('importPattern'),
+            validatePattern: document.getElementById('validatePattern')
         };
 
         this.initializeEventListeners();
         this.updateUI();
         this.updateCurrentSettingsDisplay();
         this.loadSessionHistory();
+        this.initializePatternEditor();
     }
 
     /**
@@ -138,9 +155,21 @@ class LiveTelemetryTrainer {
         this.elements.applySettings.addEventListener('click', () => this.applyAdminSettings());
         this.elements.resetDefaults.addEventListener('click', () => this.resetToDefaults());
 
+        // Channel visibility toggles
+        this.elements.showThrottle.addEventListener('change', () => this.updateChannelVisibility());
+        this.elements.showBrake.addEventListener('change', () => this.updateChannelVisibility());
+
         // Session history
         this.elements.clearHistory.addEventListener('click', () => this.clearAllHistory());
         this.elements.exitReplay.addEventListener('click', () => this.exitReplayMode());
+
+        // Pattern editor
+        this.elements.patternSelect.addEventListener('change', () => this.updatePatternInfo());
+        this.elements.loadPattern.addEventListener('click', () => this.loadSelectedPattern());
+        this.elements.saveCustomPattern.addEventListener('click', () => this.saveCustomPattern());
+        this.elements.exportPattern.addEventListener('click', () => this.exportPatternJSON());
+        this.elements.importPattern.addEventListener('click', () => this.importPatternJSON());
+        this.elements.validatePattern.addEventListener('click', () => this.validatePatternJSON());
 
         // Window resize
         window.addEventListener('resize', () => {
@@ -219,6 +248,7 @@ class LiveTelemetryTrainer {
             this.currentSession = {
                 startTime: new Date().toISOString(),
                 mode: this.trainingMode,
+                pattern: this.telemetryData.getCurrentPatternName(),
                 settings: { ...this.beginnerSettings },
                 samples: []
             };
@@ -386,7 +416,7 @@ class LiveTelemetryTrainer {
         
         switch(preset) {
             case 'easy':
-                speed = 0.5;
+                speed = 0.3;
                 tolerance = 20;
                 threshold = 5;
                 overlap = false;
@@ -495,6 +525,15 @@ class LiveTelemetryTrainer {
     }
 
     /**
+     * Update channel visibility based on toggles
+     */
+    updateChannelVisibility() {
+        const showThrottle = this.elements.showThrottle.checked;
+        const showBrake = this.elements.showBrake.checked;
+        this.graphRenderer.setChannelVisibility(showThrottle, showBrake);
+    }
+
+    /**
      * Update all UI elements
      */
     updateUI() {
@@ -531,6 +570,7 @@ class LiveTelemetryTrainer {
     showSessionSummary() {
         const summary = this.scoringSystem.getSessionSummary(this.tolerance);
 
+        document.getElementById('summaryPattern').textContent = this.telemetryData.getCurrentPatternName();
         document.getElementById('summaryDeviation').textContent = summary.meanDeviation + '%';
         document.getElementById('summaryOffset').textContent = summary.timingOffset + 'ms';
         document.getElementById('summarySmoothness').textContent = summary.smoothness + '%';
@@ -567,6 +607,7 @@ class LiveTelemetryTrainer {
             id: Date.now(),
             timestamp: this.currentSession.startTime,
             mode: this.currentSession.mode,
+            pattern: this.currentSession.pattern,
             settings: this.currentSession.settings,
             duration: this.currentTime,
             summary: summary,
@@ -608,6 +649,7 @@ class LiveTelemetryTrainer {
             const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
             const grade = session.summary.grade;
             const gradeClass = grade.startsWith('A') ? 'good' : (grade === 'B' || grade === 'C') ? 'ok' : 'bad';
+            const patternName = session.pattern || 'Race Track'; // Default for old sessions
             
             return `
                 <div class="session-item" data-session-id="${session.id}">
@@ -616,6 +658,7 @@ class LiveTelemetryTrainer {
                         <span class="session-grade ${gradeClass}">${grade}</span>
                     </div>
                     <div class="session-details">
+                        <p><strong>Pattern:</strong> ${patternName}</p>
                         <p><strong>Mode:</strong> ${session.mode === 'beginner' ? 'Beginner' : 'Advanced'}</p>
                         <p><strong>Deviation:</strong> ${session.summary.meanDeviation}%</p>
                         <p><strong>Smoothness:</strong> ${session.summary.smoothness}%</p>
@@ -713,6 +756,203 @@ class LiveTelemetryTrainer {
 
         localStorage.removeItem('telemetryTrainingSessions');
         this.loadSessionHistory();
+    }
+
+    // ==================== PATTERN EDITOR METHODS ====================
+
+    /**
+     * Initialize pattern editor UI
+     */
+    initializePatternEditor() {
+        this.updatePatternInfo();
+    }
+
+    /**
+     * Update pattern info when selection changes
+     */
+    updatePatternInfo() {
+        const selectedKey = this.elements.patternSelect.value;
+        const pattern = TELEMETRY_PATTERNS[selectedKey];
+
+        if (pattern) {
+            this.elements.patternDescription.textContent = pattern.description;
+            this.elements.patternDuration.textContent = `Duration: ${pattern.duration}s`;
+            this.elements.patternJSON.value = JSON.stringify(pattern, null, 2);
+            this.hideValidationMessage();
+            
+            // Update current pattern display
+            this.elements.currentPattern.textContent = pattern.name;
+        }
+    }
+
+    /**
+     * Load selected pattern from dropdown
+     */
+    loadSelectedPattern() {
+        const selectedKey = this.elements.patternSelect.value;
+        
+        if (this.isRunning) {
+            this.showValidationMessage('Cannot change pattern while training is active', 'error');
+            return;
+        }
+
+        try {
+            this.telemetryData.setPattern(selectedKey);
+            this.reset();
+            this.showValidationMessage(`Pattern "${TELEMETRY_PATTERNS[selectedKey].name}" loaded successfully!`, 'success');
+            
+            // Update current pattern display
+            this.elements.currentPattern.textContent = TELEMETRY_PATTERNS[selectedKey].name;
+            
+            // Update graph with new pattern
+            if (this.graphRenderer) {
+                this.graphRenderer.updateReferenceData(this.telemetryData.getAllData());
+            }
+        } catch (error) {
+            this.showValidationMessage(`Failed to load pattern: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Save custom pattern from JSON editor
+     */
+    saveCustomPattern() {
+        if (this.isRunning) {
+            this.showValidationMessage('Cannot change pattern while training is active', 'error');
+            return;
+        }
+
+        try {
+            const jsonText = this.elements.patternJSON.value;
+            const patternData = JSON.parse(jsonText);
+            
+            // Validate pattern
+            const validation = validatePattern(patternData);
+            if (!validation.valid) {
+                this.showValidationMessage(`Validation error: ${validation.error}`, 'error');
+                return;
+            }
+
+            // Load the custom pattern
+            this.telemetryData.loadPatternJSON(patternData);
+            this.reset();
+            this.showValidationMessage(`Custom pattern "${patternData.name}" loaded successfully!`, 'success');
+            
+            // Update pattern info
+            this.elements.patternDescription.textContent = patternData.description || 'Custom pattern';
+            this.elements.patternDuration.textContent = `Duration: ${patternData.duration}s`;
+            
+            // Update graph
+            if (this.graphRenderer) {
+                this.graphRenderer.updateReferenceData(this.telemetryData.getAllData());
+            }
+        } catch (error) {
+            this.showValidationMessage(`Failed to load custom pattern: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Export current pattern as JSON file
+     */
+    exportPatternJSON() {
+        try {
+            const pattern = this.telemetryData.getCurrentPattern();
+            if (!pattern) {
+                this.showValidationMessage('No pattern loaded', 'error');
+                return;
+            }
+
+            const jsonString = JSON.stringify(pattern, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${pattern.name.replace(/\s+/g, '_').toLowerCase()}_pattern.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            this.showValidationMessage('Pattern exported successfully!', 'success');
+        } catch (error) {
+            this.showValidationMessage(`Export failed: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Import pattern from JSON file
+     */
+    importPatternJSON() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const jsonText = event.target.result;
+                    const patternData = JSON.parse(jsonText);
+                    
+                    // Display in editor
+                    this.elements.patternJSON.value = JSON.stringify(patternData, null, 2);
+                    
+                    // Update info
+                    if (patternData.name) {
+                        this.elements.patternDescription.textContent = patternData.description || 'Imported pattern';
+                        this.elements.patternDuration.textContent = `Duration: ${patternData.duration || 0}s`;
+                    }
+                    
+                    this.showValidationMessage('Pattern imported! Click "Save Custom" to load it.', 'success');
+                } catch (error) {
+                    this.showValidationMessage(`Import failed: ${error.message}`, 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+        };
+        
+        input.click();
+    }
+
+    /**
+     * Validate pattern JSON in editor
+     */
+    validatePatternJSON() {
+        try {
+            const jsonText = this.elements.patternJSON.value;
+            const patternData = JSON.parse(jsonText);
+            
+            const validation = validatePattern(patternData);
+            
+            if (validation.valid) {
+                this.showValidationMessage('✓ Pattern is valid!', 'success');
+            } else {
+                this.showValidationMessage(`✗ Validation error: ${validation.error}`, 'error');
+            }
+        } catch (error) {
+            this.showValidationMessage(`✗ JSON parsing error: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Show validation message
+     */
+    showValidationMessage(message, type) {
+        this.elements.patternValidation.textContent = message;
+        this.elements.patternValidation.className = `validation-message ${type}`;
+    }
+
+    /**
+     * Hide validation message
+     */
+    hideValidationMessage() {
+        this.elements.patternValidation.className = 'validation-message';
+        this.elements.patternValidation.textContent = '';
     }
 }
 

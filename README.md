@@ -93,6 +93,43 @@ The reference is designed to teach you:
 - Progressive throttle application
 - Lift-and-coast sections
 
+### Custom Patterns (Pattern Editor)
+
+**NEW!** Create and load custom training patterns through the Admin Panel:
+
+- **9 Predefined Patterns**: Race Track, Highway Cruise, City Traffic, Trail Braking Focus, Throttle Control, Brake Control, Chicane Practice, Oval Racing
+- **JSON-Based Editor**: Edit patterns directly or create your own from scratch
+- **Import/Export**: Share patterns or backup your custom creations
+- **Real-time Validation**: Ensure patterns are valid before loading
+
+📖 See [PATTERN_EDITOR_GUIDE.md](PATTERN_EDITOR_GUIDE.md) for complete pattern creation documentation.
+
+## Admin Panel
+
+Access the Admin Panel using the hamburger menu (☰) in the top-left corner:
+
+### Custom Settings
+- **Playback Speed**: 0.3× to 1.0× (slow down for practice)
+- **Tolerance**: ±5% to ±25% (adjust difficulty)
+- **Brake Lock Threshold**: 5% to 30% (when throttle locks in Beginner Mode)
+- **Allow Overlap**: Enable/disable throttle/brake overlap
+
+### Presets
+- **Easy**: 0.5× speed, ±20% tolerance
+- **Medium**: 0.7× speed, ±15% tolerance (default)
+- **Hard**: 0.9× speed, ±10% tolerance
+
+### Session History
+- Review past sessions with full metrics
+- Replay previous sessions to see your performance
+- Clear history when needed
+
+### Pattern Editor
+- Select from predefined patterns
+- Create custom patterns using JSON
+- Import/Export pattern definitions
+- Validate patterns before loading
+
 ## Technical Details
 
 - **Update rate**: 60 FPS
@@ -123,10 +160,14 @@ The reference is designed to teach you:
 - `index.html` - Main application page
 - `styles.css` - Visual styling
 - `app.js` - Main application logic and coordination
-- `telemetryData.js` - Reference telemetry generation
+- `telemetryData.js` - Reference telemetry generation with pattern system
+- `telemetryPatterns.js` - Pattern library with predefined training patterns
 - `inputHandler.js` - Keyboard and pedal input processing
 - `graphRenderer.js` - Canvas-based graph rendering
 - `scoring.js` - Performance metrics and grading
+- `README.md` - This file
+- `DOCUMENTATION.md` - Technical documentation
+- `PATTERN_EDITOR_GUIDE.md` - Pattern creation guide
 
 ## Browser Support
 

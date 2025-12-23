@@ -1,32 +1,57 @@
 /**
  * Reference telemetry data generator and storage
  * Generates realistic throttle and brake patterns for training
+ * Now supports pattern-based generation with keyframe interpolation
  */
 
 class TelemetryData {
-    constructor() {
-        this.referenceData = this.generateReferenceData();
+    constructor(patternKey = 'default') {
+        this.currentPattern = null;
+        this.setPattern(patternKey);
     }
 
     /**
-     * Generate realistic reference telemetry with typical racing patterns
-     * Includes smooth transitions, trail braking zones, and varied corners
+     * Set current pattern from pattern library
      */
-    generateReferenceData() {
+    setPattern(patternKey) {
+        if (!TELEMETRY_PATTERNS[patternKey]) {
+            console.warn(`Pattern '${patternKey}' not found, using 'default'`);
+            patternKey = 'default';
+        }
+        
+        this.currentPattern = TELEMETRY_PATTERNS[patternKey];
+        this.referenceData = this.generateFromPattern(this.currentPattern);
+    }
+
+    /**
+     * Load pattern from JSON object (custom patterns)
+     */
+    loadPatternJSON(patternJSON) {
+        const validation = validatePattern(patternJSON);
+        if (!validation.valid) {
+            throw new Error(`Invalid pattern: ${validation.error}`);
+        }
+        
+        this.currentPattern = patternJSON;
+        this.referenceData = this.generateFromPattern(this.currentPattern);
+    }
+
+    /**
+     * Generate telemetry data from pattern definition
+     */
+    generateFromPattern(pattern) {
         const data = [];
-        const duration = 30; // 30 seconds of data
         const sampleRate = 60; // 60 Hz
-        const totalSamples = duration * sampleRate;
+        const totalSamples = Math.floor(pattern.duration * sampleRate);
 
         for (let i = 0; i < totalSamples; i++) {
             const time = i / sampleRate;
-            const throttle = this.calculateThrottle(time, duration);
-            const brake = this.calculateBrake(time, duration);
+            const values = this.getValuesAtTime(time, pattern);
 
             data.push({
                 time: time,
-                throttle: Math.max(0, Math.min(100, throttle)),
-                brake: Math.max(0, Math.min(100, brake))
+                throttle: Math.max(0, Math.min(100, values.throttle)),
+                brake: Math.max(0, Math.min(100, values.brake))
             });
         }
 
@@ -34,124 +59,55 @@ class TelemetryData {
     }
 
     /**
-     * Calculate throttle value at given time
-     * Creates realistic acceleration and lift-off patterns
+     * Get throttle and brake values at specific time using keyframe interpolation
      */
-    calculateThrottle(time, duration) {
-        const pattern = time / duration * Math.PI * 4; // 4 corner patterns
-
-        // Base throttle pattern with smooth transitions
+    getValuesAtTime(time, pattern) {
         let throttle = 0;
+        let brake = 0;
 
-        // Straight sections with full throttle
-        if (time < 3) {
-            throttle = this.smoothRamp(time, 0, 2, 0, 100);
-        } else if (time < 6) {
-            throttle = 100;
-        } else if (time < 8) {
-            // Lift for corner entry
-            throttle = this.smoothRamp(time, 6, 7.5, 100, 20);
-        } else if (time < 10) {
-            // Trail braking zone - very low throttle
-            throttle = 10;
-        } else if (time < 12) {
-            // Corner exit acceleration
-            throttle = this.smoothRamp(time, 10, 12, 10, 100);
-        } else if (time < 16) {
-            // Full throttle straight
-            throttle = 100;
-        } else if (time < 18) {
-            // Lift for tight corner
-            throttle = this.smoothRamp(time, 16, 17.5, 100, 0);
-        } else if (time < 20) {
-            // Slow corner, no throttle
-            throttle = 0;
-        } else if (time < 23) {
-            // Progressive acceleration
-            throttle = this.smoothRamp(time, 20, 23, 0, 100);
-        } else if (time < 26) {
-            // Full throttle
-            throttle = 100;
-        } else if (time < 28) {
-            // Final corner lift
-            throttle = this.smoothRamp(time, 26, 27.5, 100, 30);
-        } else {
-            // Gentle acceleration to finish
-            throttle = this.smoothRamp(time, 28, 30, 30, 80);
+        // Find all segments that overlap with current time
+        for (const segment of pattern.segments) {
+            const [startTime, endTime] = segment.timeRange;
+            
+            if (time >= startTime && time <= endTime) {
+                // Interpolate values within this segment
+                const progress = (time - startTime) / (endTime - startTime);
+                throttle += this.interpolate(segment.throttle[0], segment.throttle[1], progress);
+                brake += this.interpolate(segment.brake[0], segment.brake[1], progress);
+            }
         }
 
         // Add subtle variation for realism
         throttle += Math.sin(time * 5) * 2;
-
-        return throttle;
-    }
-
-    /**
-     * Calculate brake value at given time
-     * Creates realistic braking patterns with smooth ramps
-     */
-    calculateBrake(time, duration) {
-        let brake = 0;
-
-        // Braking zones with realistic profiles
-        if (time >= 6.5 && time < 10) {
-            // First braking zone - medium corner
-            if (time < 7.5) {
-                // Initial brake application - aggressive
-                brake = this.smoothRamp(time, 6.5, 7.5, 0, 85);
-            } else if (time < 9) {
-                // Trail braking - gradual release
-                brake = this.smoothRamp(time, 7.5, 9, 85, 20);
-            } else {
-                // Final release
-                brake = this.smoothRamp(time, 9, 10, 20, 0);
-            }
-        } else if (time >= 16.5 && time < 20) {
-            // Second braking zone - tight corner, heavy braking
-            if (time < 17.5) {
-                // Hard brake application
-                brake = this.smoothRamp(time, 16.5, 17.5, 0, 100);
-            } else if (time < 19) {
-                // Hold high brake pressure
-                brake = this.smoothRamp(time, 17.5, 19, 100, 70);
-            } else {
-                // Release
-                brake = this.smoothRamp(time, 19, 20, 70, 0);
-            }
-        } else if (time >= 26.5 && time < 29) {
-            // Third braking zone - medium corner
-            if (time < 27.5) {
-                // Brake application
-                brake = this.smoothRamp(time, 26.5, 27.5, 0, 75);
-            } else {
-                // Trail braking release
-                brake = this.smoothRamp(time, 27.5, 29, 75, 0);
-            }
-        }
-
-        // Add subtle variation for realism
         if (brake > 10) {
             brake += Math.sin(time * 8) * 3;
         }
 
-        return brake;
+        return { throttle, brake };
     }
 
     /**
-     * Smooth interpolation between two values
-     * Uses easing for realistic feel
+     * Smooth interpolation between two values with easing
      */
-    smoothRamp(time, startTime, endTime, startValue, endValue) {
-        if (time <= startTime) return startValue;
-        if (time >= endTime) return endValue;
-
-        const progress = (time - startTime) / (endTime - startTime);
+    interpolate(start, end, progress) {
         // Use ease-in-out curve for natural feel
         const eased = progress < 0.5
             ? 2 * progress * progress
             : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-        return startValue + (endValue - startValue) * eased;
+        return start + (end - start) * eased;
+    }
+
+    /**
+     * Smooth interpolation between two values with easing
+     */
+    interpolate(start, end, progress) {
+        // Use ease-in-out curve for natural feel
+        const eased = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+        return start + (end - start) * eased;
     }
 
     /**
@@ -190,5 +146,19 @@ class TelemetryData {
      */
     getAllData() {
         return this.referenceData;
+    }
+
+    /**
+     * Get current pattern definition
+     */
+    getCurrentPattern() {
+        return this.currentPattern;
+    }
+
+    /**
+     * Get pattern name
+     */
+    getPatternName() {
+        return this.currentPattern ? this.currentPattern.name : 'Unknown';
     }
 }

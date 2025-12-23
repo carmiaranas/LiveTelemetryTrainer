@@ -88,6 +88,61 @@
                 </div>
                 <button id="clearHistory" class="reset-btn" style="margin-top: 10px;">Clear All History</button>
             </div>
+
+            <div class="admin-section">
+                <h3>Channel Display</h3>
+                <div class="setting-item">
+                    <label>Show on Graph:</label>
+                    <div class="channel-toggles">
+                        <label class="channel-option">
+                            <input type="checkbox" id="showThrottle" class="channel-checkbox" checked>
+                            <span class="channel-label throttle-label">Throttle</span>
+                        </label>
+                        <label class="channel-option">
+                            <input type="checkbox" id="showBrake" class="channel-checkbox" checked>
+                            <span class="channel-label brake-label">Brake</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+                <div class="admin-section">
+                <h3>Pattern Editor</h3>
+                
+                <div class="setting-item">
+                    <label for="patternSelect">Select Pattern</label>
+                    <select id="patternSelect" class="pattern-selector">
+                        <option value="default">Race Track</option>
+                        <option value="highway">Highway Cruise</option>
+                        <option value="city">City Traffic</option>
+                        <option value="trail-braking">Trail Braking Focus</option>
+                        <option value="acceleration">Throttle Control</option>
+                        <option value="braking">Brake Control</option>
+                        <option value="chicane">Chicane Practice</option>
+                        <option value="oval">Oval Racing</option>
+                    </select>
+                </div>
+
+                <div class="pattern-info">
+                    <p id="patternDescription" class="pattern-description">Mixed corners with trail braking zones - full racing experience</p>
+                    <p id="patternDuration" class="pattern-duration">Duration: 30s</p>
+                </div>
+
+                <div class="setting-item">
+                    <label for="patternJSON">Pattern JSON</label>
+                    <textarea id="patternJSON" class="json-editor" rows="15" spellcheck="false"></textarea>
+                </div>
+
+                <div id="patternValidation" class="validation-message"></div>
+
+                <div class="pattern-controls">
+                    <button id="loadPattern" class="preset-btn">Load Pattern</button>
+                    <button id="saveCustomPattern" class="preset-btn">Save Custom</button>
+                    <button id="exportPattern" class="secondary-btn">Export JSON</button>
+                    <button id="importPattern" class="secondary-btn">Import JSON</button>
+                    <button id="validatePattern" class="secondary-btn">Validate</button>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -116,6 +171,11 @@
                         <p>• Speed: 0.7×</p>
                         <p>• Tolerance: ±15%</p>
                     </div>
+                </div>
+
+                <div class="pattern-display">
+                    <h3>Current Pattern</h3>
+                    <div class="pattern-name" id="currentPattern">Race Track</div>
                 </div>
 
                 <div class="session-controls">
@@ -219,6 +279,9 @@
         <div id="summaryModal" class="modal">
             <div class="modal-content">
                 <h2>Session Complete!</h2>
+                <div class="summary-pattern">
+                    <p><strong>Pattern:</strong> <span id="summaryPattern">Race Track</span></p>
+                </div>
                 <div class="summary-stats">
                     <div class="stat-box">
                         <h3 id="summaryDeviation">--%</h3>
@@ -242,6 +305,7 @@
         </div>
     </div>
 
+    <script src="telemetryPatterns.js"></script>
     <script src="telemetryData.js"></script>
     <script src="inputHandler.js"></script>
     <script src="graphRenderer.js"></script>

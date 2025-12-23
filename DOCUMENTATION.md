@@ -528,7 +528,7 @@ Session Recording:
   • currentSession.samples: array of 60 Hz telemetry samples
 
 Beginner Settings:
-  • playbackSpeed: 0.5-1.0 (multiplier)
+  • playbackSpeed: 0.3-1.0 (multiplier)
   • tolerance: 8-20% (acceptable deviation)
   • brakeThreshold: 5-15% (overlap prevention)
   • allowOverlap: boolean (allow throttle+brake)
@@ -578,7 +578,7 @@ Beginner Settings:
 **Presets:**
 ```javascript
 Easy:
-  • playbackSpeed: 0.5× (half speed)
+  • playbackSpeed: 0.3× (ultra slow, 3.3× more time)
   • tolerance: ±20%
   • brakeThreshold: 5%
   • allowOverlap: false

@@ -11,7 +11,9 @@ class GraphRenderer {
         // Graph configuration
         this.config = {
             scrollSpeed: 100,      // pixels per second
-            timeWindow: 5,         // seconds visible
+            timeWindow: 10,        // seconds visible (increased from 5)
+            pastWindow: 3,         // seconds of past data
+            futureWindow: 7,       // seconds of future data
             updateRate: 60,        // FPS
             padding: {
                 top: 20,
@@ -24,6 +26,12 @@ class GraphRenderer {
         // Data buffers
         this.playerHistory = [];
         this.maxHistoryLength = 300; // 5 seconds at 60 Hz
+
+        // Channel visibility
+        this.channelVisibility = {
+            throttle: true,
+            brake: true
+        };
 
         // Colors
         this.colors = {
@@ -112,9 +120,10 @@ class GraphRenderer {
         this.ctx.fillStyle = this.colors.background;
         this.ctx.fillRect(0, 0, this.width, this.height);
 
-        // Calculate visible time range
-        const timeEnd = currentTime;
-        const timeStart = Math.max(0, timeEnd - this.config.timeWindow);
+        // Calculate visible time range - show past and future
+        const timeStart = Math.max(0, currentTime - this.config.pastWindow);
+        const timeEnd = Math.min(referenceData[referenceData.length - 1].time, 
+                                  currentTime + this.config.futureWindow);
 
         // Draw background zones first
         this.drawBackgroundZones(referenceData, timeStart, timeEnd);
@@ -125,19 +134,34 @@ class GraphRenderer {
         // Draw axes
         this.drawAxes();
 
-        // Draw reference traces
-        this.drawReferenceLine(referenceData, timeStart, timeEnd, 'throttle');
-        this.drawReferenceLine(referenceData, timeStart, timeEnd, 'brake');
+        // Draw current time indicator (vertical line showing "now")
+        this.drawCurrentTimeIndicator(currentTime, timeStart, timeEnd);
 
-        // Draw player traces
-        this.drawPlayerLine(timeStart, timeEnd, 'throttle', trainingMode);
-        this.drawPlayerLine(timeStart, timeEnd, 'brake', trainingMode);
+        // Draw reference traces with different opacity for past/future (only if channel visible)
+        if (this.channelVisibility.throttle) {
+            this.drawReferenceLine(referenceData, timeStart, timeEnd, 'throttle', currentTime);
+        }
+        if (this.channelVisibility.brake) {
+            this.drawReferenceLine(referenceData, timeStart, timeEnd, 'brake', currentTime);
+        }
 
-        // Draw current value indicators
+        // Draw player traces (only if channel visible)
+        if (this.channelVisibility.throttle) {
+            this.drawPlayerLine(timeStart, timeEnd, 'throttle', trainingMode);
+        }
+        if (this.channelVisibility.brake) {
+            this.drawPlayerLine(timeStart, timeEnd, 'brake', trainingMode);
+        }
+
+        // Draw current value indicators (only if channel visible)
         if (this.playerHistory.length > 0) {
             const latest = this.playerHistory[this.playerHistory.length - 1];
-            this.drawCurrentIndicator(latest.throttle, this.colors.playerGood, 'T');
-            this.drawCurrentIndicator(latest.brake, this.colors.playerBad, 'B');
+            if (this.channelVisibility.throttle) {
+                this.drawCurrentIndicator(latest.throttle, this.colors.playerGood, 'T');
+            }
+            if (this.channelVisibility.brake) {
+                this.drawCurrentIndicator(latest.brake, this.colors.playerBad, 'B');
+            }
         }
     }
 
@@ -154,8 +178,8 @@ class GraphRenderer {
                 const x1 = this.timeToX(t, timeStart, timeEnd);
                 const x2 = this.timeToX(t + 0.1, timeStart, timeEnd);
                 
-                // Draw brake zone (brake takes priority)
-                if (ref.brake > threshold) {
+                // Draw brake zone (brake takes priority) - only if brake channel is visible
+                if (this.channelVisibility.brake && ref.brake > threshold) {
                     this.ctx.fillStyle = this.colors.brakeZone;
                     this.ctx.fillRect(
                         x1,
@@ -164,8 +188,8 @@ class GraphRenderer {
                         this.graphArea.height
                     );
                 }
-                // Draw throttle zone
-                else if (ref.throttle > threshold) {
+                // Draw throttle zone - only if throttle channel is visible
+                else if (this.channelVisibility.throttle && ref.throttle > threshold) {
                     this.ctx.fillStyle = this.colors.throttleZone;
                     this.ctx.fillRect(
                         x1,
@@ -238,11 +262,33 @@ class GraphRenderer {
     }
 
     /**
+     * Draw current time indicator (vertical line showing "now")
+     */
+    drawCurrentTimeIndicator(currentTime, timeStart, timeEnd) {
+        const x = this.timeToX(currentTime, timeStart, timeEnd);
+        
+        // Draw vertical line
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([]);
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, this.graphArea.y);
+        this.ctx.lineTo(x, this.graphArea.y + this.graphArea.height);
+        this.ctx.stroke();
+
+        // Add label at top
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.fillText('NOW', x, this.graphArea.y - 5);
+    }
+
+    /**
      * Draw reference data line with color coding
      */
-    drawReferenceLine(referenceData, timeStart, timeEnd, channel) {
+    drawReferenceLine(referenceData, timeStart, timeEnd, channel, currentTime) {
         this.ctx.lineWidth = 3;
-        this.ctx.globalAlpha = 0.8;
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
         this.ctx.setLineDash([8, 4]); // Dotted line: 8px dash, 4px gap
@@ -272,6 +318,10 @@ class GraphRenderer {
             } else { // brake
                 color = value1 > threshold ? this.colors.referenceBrake : this.colors.referenceInactive;
             }
+            
+            // Set opacity based on whether this is in the future
+            const isFuture = t1 > currentTime;
+            this.ctx.globalAlpha = isFuture ? 0.5 : 0.8;
             
             this.ctx.strokeStyle = color;
             this.ctx.beginPath();
@@ -377,5 +427,13 @@ class GraphRenderer {
      */
     handleResize() {
         this.setupCanvas();
+    }
+
+    /**
+     * Set channel visibility
+     */
+    setChannelVisibility(throttle, brake) {
+        this.channelVisibility.throttle = throttle;
+        this.channelVisibility.brake = brake;
     }
 }
