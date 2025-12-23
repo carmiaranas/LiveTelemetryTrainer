@@ -159,6 +159,16 @@ class LiveTelemetryTrainer {
         this.elements.showThrottle.addEventListener('change', () => this.updateChannelVisibility());
         this.elements.showBrake.addEventListener('change', () => this.updateChannelVisibility());
 
+        // Graph zoom controls
+        document.getElementById('zoomIn').addEventListener('click', () => this.adjustGraphZoom(1));
+        document.getElementById('zoomOut').addEventListener('click', () => this.adjustGraphZoom(-1));
+
+        // Focus mode toggle
+        document.getElementById('focusModeToggle').addEventListener('click', () => this.toggleFocusMode());
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => this.handleKeyboardShortcut(e));
+
         // Session history
         this.elements.clearHistory.addEventListener('click', () => this.clearAllHistory());
         this.elements.exitReplay.addEventListener('click', () => this.exitReplayMode());
@@ -175,6 +185,18 @@ class LiveTelemetryTrainer {
         window.addEventListener('resize', () => {
             this.graphRenderer.handleResize();
         });
+
+        // Handle canvas resize on load and after layout settles
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                this.graphRenderer.handleResize();
+            }, 100);
+        });
+
+        // Ensure canvas is sized correctly after initial render
+        setTimeout(() => {
+            this.graphRenderer.handleResize();
+        }, 100);
 
         // Prevent accidental page navigation
         window.addEventListener('beforeunload', (e) => {
@@ -248,12 +270,15 @@ class LiveTelemetryTrainer {
             this.currentSession = {
                 startTime: new Date().toISOString(),
                 mode: this.trainingMode,
-                pattern: this.telemetryData.getCurrentPatternName(),
+                pattern: this.telemetryData.getPatternName(),
                 settings: { ...this.beginnerSettings },
                 samples: []
             };
         }
 
+        // Auto-hide non-essential controls when training starts
+        this.hideNonEssentialControls();
+        
         // Start animation loop
         this.animate();
     }
@@ -269,6 +294,9 @@ class LiveTelemetryTrainer {
         // Enable mode switching
         this.elements.beginnerMode.disabled = false;
         this.elements.advancedMode.disabled = false;
+
+        // Show controls again
+        this.showNonEssentialControls();
 
         // Cancel animation
         if (this.animationFrameId) {
@@ -534,15 +562,124 @@ class LiveTelemetryTrainer {
     }
 
     /**
+     * Handle keyboard shortcuts
+     */
+    handleKeyboardShortcut(e) {
+        // Don't trigger shortcuts when typing in input fields
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            return;
+        }
+
+        switch(e.code) {
+            case 'Space':
+            case 'Enter':
+                e.preventDefault();
+                this.toggleTraining();
+                break;
+            case 'Escape':
+                e.preventDefault();
+                if (this.isRunning) {
+                    this.stop();
+                } else {
+                    this.reset();
+                }
+                break;
+            case 'KeyR':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    this.reset();
+                }
+                break;
+        }
+    }
+
+    /**
+     * Toggle focus mode (hide/show non-essential controls)
+     */
+    toggleFocusMode() {
+        const controlsRow = document.querySelector('.controls-row');
+        const isFocusMode = controlsRow.classList.contains('hidden');
+        
+        if (isFocusMode) {
+            this.showNonEssentialControls();
+        } else {
+            this.hideNonEssentialControls();
+        }
+    }
+
+    /**
+     * Hide non-essential controls (for focus mode)
+     */
+    hideNonEssentialControls() {
+        const controlsRow = document.querySelector('.controls-row');
+        const header = document.querySelector('header h1');
+        const subtitle = document.querySelector('.subtitle');
+        const focusBtn = document.getElementById('focusModeToggle');
+        
+        controlsRow.classList.add('hidden');
+        if (header) header.classList.add('compact');
+        if (subtitle) subtitle.classList.add('hidden');
+        if (focusBtn) focusBtn.textContent = '📋 Show Controls';
+        
+        // Resize graph after controls hide
+        setTimeout(() => {
+            this.graphRenderer.handleResize();
+        }, 300);
+    }
+
+    /**
+     * Show non-essential controls
+     */
+    showNonEssentialControls() {
+        const controlsRow = document.querySelector('.controls-row');
+        const header = document.querySelector('header h1');
+        const subtitle = document.querySelector('.subtitle');
+        const focusBtn = document.getElementById('focusModeToggle');
+        
+        controlsRow.classList.remove('hidden');
+        if (header) header.classList.remove('compact');
+        if (subtitle) subtitle.classList.remove('hidden');
+        if (focusBtn) focusBtn.textContent = '📺 Focus Mode';
+        
+        // Resize graph after controls show
+        setTimeout(() => {
+            this.graphRenderer.handleResize();
+        }, 300);
+    }
+
+    /**
+     * Adjust graph zoom/size
+     */
+    adjustGraphZoom(direction) {
+        const container = document.querySelector('.graph-container');
+        const currentHeight = parseInt(getComputedStyle(container).minHeight);
+        const step = 100; // pixels per zoom step
+        const minHeight = 400;
+        const maxHeight = 1200;
+        
+        let newHeight = currentHeight + (direction * step);
+        newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+        
+        container.style.minHeight = newHeight + 'px';
+        
+        // Update zoom level display
+        const zoomPercent = Math.round((newHeight / 600) * 100);
+        document.getElementById('zoomLevel').textContent = zoomPercent + '%';
+        
+        // Resize canvas
+        setTimeout(() => {
+            this.graphRenderer.handleResize();
+        }, 50);
+    }
+
+    /**
      * Update all UI elements
      */
     updateUI() {
-        // Update input displays
+        // Update input displays (circular gauges)
         const inputs = this.inputHandler.getInputs();
-        this.elements.throttleBar.style.width = inputs.throttle + '%';
-        this.elements.brakeBar.style.width = inputs.brake + '%';
-        this.elements.throttleValue.textContent = Math.round(inputs.throttle) + '%';
-        this.elements.brakeValue.textContent = Math.round(inputs.brake) + '%';
+        this.updateGauge('throttle', inputs.throttle);
+        this.updateGauge('brake', inputs.brake);
 
         // Update scores
         if (this.isRunning) {
@@ -565,12 +702,32 @@ class LiveTelemetryTrainer {
     }
 
     /**
+     * Update circular gauge display
+     */
+    updateGauge(type, value) {
+        const gaugeId = type + 'Gauge';
+        const valueId = type + 'GaugeValue';
+        const gauge = document.getElementById(gaugeId);
+        const valueDisplay = document.getElementById(valueId);
+        
+        if (gauge && valueDisplay) {
+            // Calculate stroke dash offset for circular progress
+            const circumference = 2 * Math.PI * 50; // r=50
+            const offset = circumference - (value / 100) * circumference;
+            gauge.style.strokeDashoffset = offset;
+            
+            // Update value text
+            valueDisplay.textContent = Math.round(value) + '%';
+        }
+    }
+
+    /**
      * Show session summary modal
      */
     showSessionSummary() {
         const summary = this.scoringSystem.getSessionSummary(this.tolerance);
 
-        document.getElementById('summaryPattern').textContent = this.telemetryData.getCurrentPatternName();
+        document.getElementById('summaryPattern').textContent = this.telemetryData.getPatternName();
         document.getElementById('summaryDeviation').textContent = summary.meanDeviation + '%';
         document.getElementById('summaryOffset').textContent = summary.timingOffset + 'ms';
         document.getElementById('summarySmoothness').textContent = summary.smoothness + '%';

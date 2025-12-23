@@ -58,23 +58,35 @@ class GraphRenderer {
      */
     setupCanvas() {
         const container = this.canvas.parentElement;
+        
+        // Force layout recalculation
+        container.offsetHeight;
+        
         const rect = container.getBoundingClientRect();
+        
+        // Ensure we have valid dimensions
+        if (rect.width === 0 || rect.height === 0) {
+            console.warn('Canvas container has zero dimensions, retrying...');
+            setTimeout(() => this.setupCanvas(), 100);
+            return;
+        }
         
         // Set display size
         this.canvas.style.width = '100%';
         this.canvas.style.height = '100%';
+        
+        // Store logical dimensions
+        this.width = rect.width;
+        this.height = rect.height;
         
         // Set actual size in memory (scaled for retina displays)
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = rect.width * dpr;
         this.canvas.height = rect.height * dpr;
         
-        // Scale context to match
+        // Get fresh context and scale it
+        this.ctx = this.canvas.getContext('2d');
         this.ctx.scale(dpr, dpr);
-        
-        // Store logical dimensions
-        this.width = rect.width;
-        this.height = rect.height;
 
         // Calculate graph area
         this.graphArea = {
@@ -83,6 +95,8 @@ class GraphRenderer {
             width: this.width - this.config.padding.left - this.config.padding.right,
             height: this.height - this.config.padding.top - this.config.padding.bottom
         };
+        
+        console.log('Canvas initialized:', this.width, 'x', this.height, 'Graph area:', this.graphArea);
     }
 
     /**
@@ -116,6 +130,19 @@ class GraphRenderer {
      * Render the complete graph
      */
     render(currentTime, referenceData, trainingMode) {
+        // Ensure canvas is properly sized
+        if (!this.width || !this.height || !this.graphArea) {
+            console.warn('Canvas not properly initialized, attempting to set up...');
+            this.setupCanvas();
+            if (!this.width || !this.height) return; // Still not ready
+        }
+
+        // Ensure we have valid reference data
+        if (!referenceData || referenceData.length === 0) {
+            console.warn('No reference data available');
+            return;
+        }
+
         // Clear canvas
         this.ctx.fillStyle = this.colors.background;
         this.ctx.fillRect(0, 0, this.width, this.height);
@@ -267,21 +294,14 @@ class GraphRenderer {
     drawCurrentTimeIndicator(currentTime, timeStart, timeEnd) {
         const x = this.timeToX(currentTime, timeStart, timeEnd);
         
-        // Draw vertical line
+        // Draw vertical line (thicker and more prominent)
         this.ctx.strokeStyle = '#ffffff';
-        this.ctx.lineWidth = 2;
+        this.ctx.lineWidth = 4;
         this.ctx.setLineDash([]);
         this.ctx.beginPath();
         this.ctx.moveTo(x, this.graphArea.y);
         this.ctx.lineTo(x, this.graphArea.y + this.graphArea.height);
         this.ctx.stroke();
-
-        // Add label at top
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = 'bold 12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.fillText('NOW', x, this.graphArea.y - 5);
     }
 
     /**

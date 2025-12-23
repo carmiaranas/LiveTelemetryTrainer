@@ -148,8 +148,13 @@
 
     <div class="container">
         <header>
-            <h1>Full Focus Live Telemetry Trainer</h1>
-            <p class="subtitle">Master throttle and brake control</p>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>Full Focus Live Telemetry Trainer</h1>
+                    <p class="subtitle">Master throttle and brake control</p>
+                </div>
+                <button id="focusModeToggle" class="focus-mode-btn" title="Toggle Focus Mode (Hide Controls)">📺 Focus Mode</button>
+            </div>
             <div id="replayBanner" class="replay-banner" style="display: none;">
                 <span>🎬 REPLAY MODE</span>
                 <button id="exitReplay" class="exit-replay-btn">Exit Replay</button>
@@ -157,9 +162,9 @@
         </header>
 
         <div class="main-content">
-            <!-- Controls Panel -->
-            <div class="controls-panel">
-                <div class="mode-selector">
+            <!-- Top Control Panels -->
+            <div class="controls-row">
+                <div class="mode-selector compact-panel">
                     <h3>Training Mode</h3>
                     <div class="button-group">
                         <button id="beginnerMode" class="mode-btn active">Beginner</button>
@@ -167,84 +172,97 @@
                     </div>
                     <div class="mode-info" id="modeInfo">
                         <p><strong>Beginner Mode</strong></p>
-                        <p>• No overlap allowed</p>
-                        <p>• Speed: 0.7×</p>
-                        <p>• Tolerance: ±15%</p>
+                        <p>• No overlap • Speed: 0.7× • Tolerance: ±15%</p>
                     </div>
                 </div>
 
-                <div class="pattern-display">
+                <div class="pattern-display compact-panel">
                     <h3>Current Pattern</h3>
                     <div class="pattern-name" id="currentPattern">Race Track</div>
                 </div>
 
-                <div class="session-controls">
+                <div class="session-controls compact-panel">
+                    <h3>Session Control</h3>
                     <button id="startBtn" class="primary-btn">Start Training</button>
                     <button id="resetBtn" class="secondary-btn">Reset</button>
                 </div>
+            </div>
 
-                <div class="input-display">
-                    <h3>Current Input</h3>
-                    <div class="input-bars">
-                        <div class="input-bar">
-                            <label>Throttle</label>
-                            <div class="bar-container">
-                                <div id="throttleBar" class="bar throttle-bar"></div>
-                                <span id="throttleValue">0%</span>
-                            </div>
-                        </div>
-                        <div class="input-bar">
-                            <label>Brake</label>
-                            <div class="bar-container">
-                                <div id="brakeBar" class="bar brake-bar"></div>
-                                <span id="brakeValue">0%</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="keyboard-hints">
-                        <p><kbd>W</kbd> Throttle</p>
-                        <p><kbd>S</kbd> Brake</p>
+            <!-- Floating Input Gauges -->
+            <div id="floatingGauges" class="floating-gauges">
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 120 120">
+                        <circle class="gauge-bg" cx="60" cy="60" r="50"/>
+                        <circle id="throttleGauge" class="gauge-fill throttle-gauge" cx="60" cy="60" r="50"/>
+                    </svg>
+                    <div class="gauge-label">
+                        <div class="gauge-value" id="throttleGaugeValue">0%</div>
+                        <div class="gauge-name">Throttle</div>
+                        <div class="gauge-key"><kbd>W</kbd></div>
                     </div>
                 </div>
-
-                <div class="score-panel">
-                    <h3>Live Scoring</h3>
-                    <div class="score-item">
-                        <div class="score-header">
-                            <span class="score-label">Mean Deviation:</span>
-                            <span id="meanDeviation" class="score-value">--%</span>
-                        </div>
-                        <p class="score-info">Avg difference from reference (active pedal only)</p>
-                    </div>
-                    <div class="score-item">
-                        <div class="score-header">
-                            <span class="score-label">Timing Offset:</span>
-                            <span id="timingOffset" class="score-value">--ms</span>
-                        </div>
-                        <p class="score-info">+ = too early, - = too late</p>
-                    </div>
-                    <div class="score-item">
-                        <div class="score-header">
-                            <span class="score-label">Smoothness:</span>
-                            <span id="smoothness" class="score-value">--%</span>
-                        </div>
-                        <p class="score-info">Based on input rate of change (higher = better)</p>
-                    </div>
-                    <div class="score-item">
-                        <div class="score-header">
-                            <span class="score-label">Accuracy:</span>
-                            <span id="accuracy" class="score-value accuracy-display">--</span>
-                        </div>
-                        <p class="score-info">Overall grade: A+ to F</p>
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 120 120">
+                        <circle class="gauge-bg" cx="60" cy="60" r="50"/>
+                        <circle id="brakeGauge" class="gauge-fill brake-gauge" cx="60" cy="60" r="50"/>
+                    </svg>
+                    <div class="gauge-label">
+                        <div class="gauge-value" id="brakeGaugeValue">0%</div>
+                        <div class="gauge-name">Brake</div>
+                        <div class="gauge-key"><kbd>S</kbd></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Telemetry Graph -->
+            <!-- Score Panel Row -->
+            <div class="score-row">
+                <div class="score-panel">
+                    <h3>Live Scoring</h3>
+                    <div class="score-grid">
+                        <div class="score-item">
+                            <div class="score-header">
+                                <span class="score-label">Mean Deviation:</span>
+                                <span id="meanDeviation" class="score-value">--%</span>
+                            </div>
+                            <p class="score-info">Avg difference from reference</p>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-header">
+                                <span class="score-label">Timing Offset:</span>
+                                <span id="timingOffset" class="score-value">--ms</span>
+                            </div>
+                            <p class="score-info">+ = too early, - = too late</p>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-header">
+                                <span class="score-label">Smoothness:</span>
+                                <span id="smoothness" class="score-value">--%</span>
+                            </div>
+                            <p class="score-info">Based on input rate of change</p>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-header">
+                                <span class="score-label">Accuracy:</span>
+                                <span id="accuracy" class="score-value accuracy-display">--</span>
+                            </div>
+                            <p class="score-info">Overall grade: A+ to F</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telemetry Graph - Now Full Width and Larger -->
             <div class="graph-container">
                 <div class="graph-header">
                     <h3>Live Telemetry</h3>
-                    <div class="legend">
+                    <div class="graph-controls">
+                        <div class="zoom-control">
+                            <label for="graphZoom">Graph Size:</label>
+                            <button id="zoomOut" class="zoom-btn" title="Zoom Out">-</button>
+                            <span id="zoomLevel">100%</span>
+                            <button id="zoomIn" class="zoom-btn" title="Zoom In">+</button>
+                        </div>
+                        <div class="legend">
                         <div class="legend-item">
                             <span class="legend-color reference-throttle"></span>
                             <span>Ref Throttle</span>
@@ -265,6 +283,7 @@
                             <span class="legend-color player-bad"></span>
                             <span>Poor</span>
                         </div>
+                    </div>
                     </div>
                 </div>
                 <canvas id="telemetryCanvas"></canvas>
